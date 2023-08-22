@@ -1,0 +1,388 @@
+   Road Traffic Accidents Severity Classifier Code
+
+
+#importing libraries
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
+
+
+df=pd.read_csv("/content/RTA Dataset.csv")
+df
+df.shape
+
+#checking the numerical statistics of the data
+df.describe()
+
+df.describe(include="all")
+
+
+
+#checking data types of each columns
+df.info()
+
+#finding duplicate values
+df.duplicated().sum()
+
+#Distribution of Accident severity
+df['Accident_severity'].value_counts()
+
+#plotting the final class
+sns.countplot(x = df['Accident_severity'])
+plt.title('Distribution of Accident severity')
+
+
+#checking missing values
+df.isna().sum()
+
+#dropping columns which has more than 2500 missing values and Time column
+df.drop(['Service_year_of_vehicle','Defect_of_vehicle','Work_of_casuality', 'Fitness_of_casuality','Time'], axis = 1, inplace = True)
+df.head()
+#storing categorical column names to a new variable
+categorical=[i for i in df.columns if df[i].dtype=='O']
+print('The categorical variables are',categorical)
+
+#for categorical values we can replace the null values with the Mode of it
+for i in categorical:
+    df[i].fillna(df[i].mode()[0],inplace=True)
+
+
+#checking the current null values
+df.isna().sum()
+
+
+#plotting relationship between Number_of_casualties and Number_of_vehicles_involved
+sns.scatterplot(x=df['Number_of_casualties'], y=df['Number_of_vehicles_involved'], hue=df['Accident_severity'])
+
+#joint Plot
+sns.jointplot(x='Number_of_casualties',y='Number_of_vehicles_involved',data=df)
+
+
+#checking the correlation between numerical columns
+df.corr()
+
+#plotting the correlation using heatmap
+sns.heatmap(df.corr())
+
+#storing numerical column names to a variable
+numerical=[i for i in df.columns if df[i].dtype!='O']
+print('The numerica variables are',numerical)
+
+#distribution for numerical columns
+plt.figure(figsize=(10,10))
+plotnumber = 1
+for i in numerical:
+    if plotnumber <= df.shape[1]:
+        ax1 = plt.subplot(2,2,plotnumber)
+        plt.hist(df[i],color='red')
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+        plt.title('frequency of '+i, fontsize=10)
+    plotnumber +=1
+
+
+#count plot for categorical values
+plt.figure(figsize=(10,200))
+plotnumber = 1
+
+for col in categorical:
+    if plotnumber <= df.shape[1] and col!='Pedestrian_movement':
+        ax1 = plt.subplot(28,1,plotnumber)
+        sns.countplot(data=df, y=col, palette='muted')
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+        plt.title(col.title(), fontsize=14)
+        plt.xlabel('')
+        plt.ylabel('')
+    plotnumber +=1
+
+df.dtypes
+
+#importing label encoing module
+from sklearn.preprocessing import LabelEncoder
+le=LabelEncoder()
+
+#creating a new data frame from performing the chi2 analysis
+df1=pd.DataFrame()
+
+#adding all the categorical columns except the output to new data frame
+for i in categorical:
+    if i!= 'Accident_severity':
+        df1[i]=le.fit_transform(df[i])
+
+
+#confirming the data type
+df1.info()
+
+
+plt.figure(figsize=(22,17))
+sns.set(font_scale=1)
+sns.heatmap(df1.corr(), annot=True)
+
+
+#import chi2 test
+from sklearn.feature_selection import chi2
+f_p_values=chi2(df1,df['Accident_severity'])
+f_p_values
+
+
+#for better understanding and ease of access adding them to a new dataframe
+f_p_values1=pd.DataFrame({'features':df1.columns, 'Fscore': f_p_values[0], 'Pvalues':f_p_values[1]})
+f_p_values1
+
+
+#since we want lower Pvalues we are sorting the features
+f_p_values1.sort_values(by='Pvalues',ascending=True)
+
+
+#after evaluating we are removing lesser important columns and storing to a new data frame
+df2=df.drop(['Owner_of_vehicle', 'Type_of_vehicle', 'Road_surface_conditions', 'Pedestrian_movement',
+         'Casualty_severity','Educational_level','Day_of_week','Sex_of_driver','Road_allignment',
+         'Sex_of_casualty'],axis=1)
+df2.head()
+
+
+#to check distinct values in each categorical columns we are storing them to a new variable
+categorical_new=[i for i in df2.columns if df2[i].dtype=='O']
+print(categorical_new)
+
+
+for i in categorical_new:
+    print(df2[i].value_counts())
+
+#get_dummies
+dummy=pd.get_dummies(df2[['Age_band_of_driver', 'Vehicle_driver_relation', 'Driving_experience',
+                          'Area_accident_occured', 'Lanes_or_Medians', 'Types_of_Junction', 'Road_surface_type',
+                          'Light_conditions', 'Weather_conditions', 'Type_of_collision', 'Vehicle_movement',
+                          'Casualty_class', 'Age_band_of_casualty', 'Cause_of_accident']],drop_first=True)
+dummy.head()
+
+#concatinate dummy and old data frame
+df3=pd.concat([df2,dummy],axis=1)
+df3.head()
+
+
+#dropping dummied columns
+df3.drop(['Age_band_of_driver', 'Vehicle_driver_relation', 'Driving_experience', 'Area_accident_occured', 'Lanes_or_Medians',
+          'Types_of_Junction', 'Road_surface_type', 'Light_conditions', 'Weather_conditions', 'Type_of_collision',
+          'Vehicle_movement','Casualty_class', 'Age_band_of_casualty', 'Cause_of_accident'],axis=1,inplace=True)
+df3.head()
+
+x=df3.drop(['Accident_severity'],axis=1)
+x.shape
+
+y=df3.iloc[:,2]
+y.head()
+
+#plotting count plot using seaborn
+sns.countplot(x = y, palette='muted')
+
+#importing SMOTE
+from imblearn.over_sampling import SMOTE
+oversample=SMOTE()
+xo,yo=oversample.fit_resample(x,y)
+
+#checking the oversampling output
+y1=pd.DataFrame(yo)
+y1.value_counts()
+sns.countplot(x = yo, palette='muted')
+
+
+from sklearn import preprocessing
+ 
+# label_encoder object knows
+# how to understand word labels.
+label_encoder = preprocessing.LabelEncoder()
+ 
+# Encode labels in column 'species'.
+yo= label_encoder.fit_transform(yo)
+ 
+yo
+
+#converting data to training data and testing data
+from sklearn.model_selection import train_test_split
+#splitting 70% of the data to training data and 30% of data to testing data
+x_train,x_test,y_train,y_test=train_test_split(xo,yo,test_size=0.30,random_state=42)
+print(y_train)
+
+
+#KNN model alg
+from sklearn.neighbors import KNeighborsClassifier
+model_KNN=KNeighborsClassifier(n_neighbors=5)
+model_KNN.fit(x_train,y_train)
+
+
+y_KNN=model_KNN.predict(x_test)
+y_KNN
+
+from sklearn.metrics import classification_report,confusion_matrix,accuracy_score,ConfusionMatrixDisplay
+matrix_KNN=confusion_matrix(y_test,y_KNN)
+print(matrix_KNN,'\n')
+print(ConfusionMatrixDisplay.from_predictions(y_test,y_KNN))
+accuracy_KNN=accuracy_score(y_test,y_KNN)
+print(accuracy_KNN,'\n')
+report_KNN=classification_report(y_test,y_KNN)
+print(report_KNN)
+
+#naive bayes model alg
+from sklearn.naive_bayes import MultinomialNB
+model_naive=MultinomialNB()
+model_naive.fit(x_train,y_train)
+
+y_naive=model_naive.predict(x_test)
+y_naive
+
+
+matrix_naive=confusion_matrix(y_test,y_naive)
+print(matrix_naive,'\n')
+print(ConfusionMatrixDisplay.from_predictions(y_test,y_naive))
+accuracy_naive=accuracy_score(y_test,y_naive)
+print(accuracy_naive,'\n')
+report_naive=classification_report(y_test,y_naive)
+print(report_naive)
+
+#SVM model alg
+from sklearn.svm import SVC
+model_SVC=SVC()
+model_SVC.fit(x_train,y_train)
+
+
+y_SVC=model_SVC.predict(x_test)
+y_SVC
+
+matrix_SVC=confusion_matrix(y_test,y_SVC)
+print(matrix_SVC,'\n')
+print(ConfusionMatrixDisplay.from_predictions(y_test,y_SVC))
+accuracy_SVC=accuracy_score(y_test,y_SVC)
+print(accuracy_SVC,'\n')
+report_SVC=classification_report(y_test,y_SVC)
+print(report_SVC)
+
+
+#Decision Tree model alg
+from sklearn.tree import DecisionTreeClassifier
+model_dec=DecisionTreeClassifier(criterion='entropy')
+model_dec.fit(x_train,y_train)
+y_dec=model_dec.predict(x_test)
+y_dec
+
+matrix_dec=confusion_matrix(y_test,y_dec)
+print(matrix_dec,'\n')
+print(ConfusionMatrixDisplay.from_predictions(y_test,y_dec))
+accuracy_dec=accuracy_score(y_test,y_dec)
+print(accuracy_dec,'\n')
+report_dec=classification_report(y_test,y_dec)
+print(report_dec)
+
+
+#Randomforest classifier
+from sklearn.ensemble import RandomForestClassifier
+model_ran=RandomForestClassifier(n_estimators=25,criterion='entropy')
+model_ran.fit(x_train,y_train)
+
+y_ran=model_ran.predict(x_test)
+y_ran
+
+matrix_dec=confusion_matrix(y_test,y_ran)
+print(matrix_dec,'\n')
+print(ConfusionMatrixDisplay.from_predictions(y_test,y_ran))
+accuracy_ran=accuracy_score(y_test,y_ran)
+print(accuracy_ran,'\n')
+report_ran=classification_report(y_test,y_ran)
+print(report_ran)
+
+
+#converting data to training data and testing data
+from sklearn.model_selection import train_test_split
+#splitting 70% of the data to training data and 30% of data to testing data
+a_train,a_test,b_train,b_test=train_test_split(xo,yo,test_size=0.30,random_state=42)
+import xgboost as xgb
+xgb_cl = xgb.XGBClassifier()
+
+
+
+from sklearn.metrics import accuracy_score
+xgb_cl.fit(a_train, b_train)
+
+# Predict
+preds = xgb_cl.predict(a_test)
+
+# Score
+accuracy_score(b_test, preds)
+
+cons_xgb=confusion_matrix(b_test,preds)
+print(confusion_matrix(b_test,preds),'\n')
+
+print(ConfusionMatrixDisplay.from_predictions(b_test,preds))
+acc_xgb=accuracy_score(b_test,preds)
+print(accuracy_score(b_test,preds),'\n')
+class_xgb=classification_report(b_test,preds)
+print(classification_report(b_test,preds))
+
+
+
+
+
+from sklearn.ensemble import AdaBoostClassifier
+clf = AdaBoostClassifier(n_estimators=100, random_state=0)
+clf.fit(a_train,b_train)
+
+ad=clf.predict(a_test)
+con_ad=confusion_matrix(b_test,ad)
+print(confusion_matrix(b_test,ad),'\n')
+print(ConfusionMatrixDisplay.from_predictions(b_test,ad))
+acc_ad=accuracy_score(b_test,ad)
+print(accuracy_score(b_test,ad),'\n')
+class_ad=classification_report(b_test,ad)
+print(classification_report(b_test,ad))
+
+
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.neural_network import MLPClassifier
+c_train, c_test, d_train, d_test = train_test_split(xo,yo,test_size=0.2,random_state=42)
+
+# Standardize the feature vectors
+scaler = StandardScaler()
+X_train = scaler.fit_transform(c_train)
+X_test = scaler.transform(c_test)
+
+
+
+model = MLPClassifier(hidden_layer_sizes=(64, 32), activation='relu', solver='adam', random_state=42)
+model.fit(c_train, d_train)
+mlp_pred=model.predict(c_test)
+# Evaluate the model on the testing set
+accuracy = model.score(c_test, d_test)
+print("Accuracy:", accuracy)
+
+
+
+
+
+con_mlp=confusion_matrix(d_test,mlp_pred)
+print(confusion_matrix(d_test,mlp_pred),'\n')
+print(ConfusionMatrixDisplay.from_predictions(d_test,mlp_pred))
+acc_mlp=accuracy_score(d_test,mlp_pred)
+print(accuracy_score(d_test,mlp_pred),'\n')
+class_mlp=classification_report(d_test,mlp_pred)
+print(classification_report(d_test,mlp_pred))
+
+
+alg=['KNN','Naive Bayes','SVM','Decision Tree','Random Forest','XGB','AdaBoost','MLPClassifier']
+acc=[accuracy_KNN,accuracy_naive,accuracy_SVC,accuracy_dec,accuracy_ran,acc_xgb,acc_ad,acc_mlp]
+Accuracy_Scores=pd.DataFrame({'Algorithms':alg, 'Accuracy': acc})
+Accuracy_Scores['Accuracy']=Accuracy_Scores['Accuracy']*100
+Accuracy_Scores
+
+
+ax = sns.barplot(x='Algorithms', y='Accuracy',
+                 palette='muted', data=Accuracy_Scores.sort_values(by='Accuracy',ascending=False),
+                 errwidth=0)
+for i in ax.containers:
+    ax.bar_label(i,)
+ 
+
